@@ -310,10 +310,18 @@ class DataReader(object):
                      self.file_extension)
         for i in range(len(frames))
     ]
+    for item_file in segment_file_list:
+        if not os.path.exists(item_file):
+            print('  path not exist: {}'.format(item_file))
+            raise ValueError
     cam_file_list = [
         os.path.join(data_dir, subfolders[i], frame_ids[i] + '_cam.txt')
         for i in range(len(frames))
     ]
+    for item_file in cam_file_list:
+        if not os.path.exists(item_file):
+            print('  path not exist: {}'.format(item_file))
+            raise ValueError
     file_lists = {}
     file_lists['image_file_list'] = image_file_list
     file_lists['segment_file_list'] = segment_file_list

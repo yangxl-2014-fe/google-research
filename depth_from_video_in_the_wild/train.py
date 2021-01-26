@@ -164,6 +164,9 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
     logging.info('Attempting to resume training from %s...', checkpoint_dir)
     checkpoint = tf.train.latest_checkpoint(checkpoint_dir)
     logging.info('Last checkpoint found: %s', checkpoint)
+    if checkpoint is None:
+        logging.error('Fail to find valid checkpoint.')
+        raise ValueError
     if checkpoint:
       saver.restore(sess, checkpoint)
     elif FLAGS.imagenet_ckpt:
