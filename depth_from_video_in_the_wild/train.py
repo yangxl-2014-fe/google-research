@@ -146,6 +146,9 @@ def main(_):
       queue_size=FLAGS.queue_size,
       input_file=FLAGS.input_file)
 
+  # print('type(train_model): {}'.format(type(train_model)))
+  # print(train_model.summary())
+
   _train(train_model, FLAGS.checkpoint_dir, FLAGS.train_steps,
          FLAGS.summary_freq)
 
@@ -156,6 +159,8 @@ def main(_):
 def _train(train_model, checkpoint_dir, train_steps, summary_freq):
   """Runs a trainig loop."""
   saver = train_model.saver
+  print('\n\n\ntype(saver): {}\n\n\n'.format(saver))
+  print('{}'.format('#' * 80))
   sv = tf.train.Supervisor(logdir=checkpoint_dir, save_summaries_secs=0,
                            saver=None)
   config = tf.ConfigProto()
@@ -166,7 +171,7 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
     logging.info('Last checkpoint found: %s', checkpoint)
     if checkpoint is None:
         logging.error('Fail to find valid checkpoint.')
-        raise ValueError
+        # raise ValueError
     if checkpoint:
       saver.restore(sess, checkpoint)
     elif FLAGS.imagenet_ckpt:
