@@ -161,7 +161,12 @@ def main(_):
 
 def _train(train_model, checkpoint_dir, train_steps, summary_freq):
   """Runs a trainig loop."""
-  logging.info('_train( {}, {}, {}, {} )'.format(type(train_model), checkpoint_dir, train_steps, summary_freq))
+  logging.warning('_train('
+                  '\n\ttrain_model={},'
+                  '\n\tcheckpoint_dir={},'
+                  '\n\ttrain_steps={},'
+                  '\n\tsummary_freq={} )'.format(
+                    type(train_model), checkpoint_dir, train_steps, summary_freq))
 
   saver = train_model.saver
   print('\n\n\ntype(saver): {}\n\n\n'.format(saver))
@@ -181,6 +186,7 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
       saver.restore(sess, checkpoint)
     elif FLAGS.imagenet_ckpt:
       logging.info('Restoring pretrained weights from %s', FLAGS.imagenet_ckpt)
+      logging.warning('Restoring pretrained weights from %s', FLAGS.imagenet_ckpt)
       train_model.imagenet_init_restorer.restore(sess, FLAGS.imagenet_ckpt)
 
     logging.info('Training...')

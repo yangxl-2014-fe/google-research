@@ -30,6 +30,8 @@ import random
 from absl import logging
 import tensorflow.compat.v1 as tf
 
+from depth_from_video_in_the_wild.configs import view_api
+
 gfile = tf.gfile
 
 QUEUE_SIZE = 2000
@@ -49,6 +51,36 @@ class DataReader(object):
                num_scales, file_extension, random_scale_crop, flipping_mode,
                random_color, imagenet_norm, shuffle, input_file='train',
                queue_size=QUEUE_SIZE, threads=1):
+    logging.warning('DataReader::__init__('
+                    '\n\tdata_dir={},'
+                    '\n\tbatch_size={},'
+                    '\n\timg_height={},'
+                    '\n\timg_width={},'
+                    '\n\tseq_length={},'
+                    '\n\tnum_scales={},'
+                    '\n\tfile_extension={},'
+                    '\n\trandom_scale_crop={},'
+                    '\n\tflipping_mode={},'
+                    '\n\trandom_color={},'
+                    '\n\timagenet_norm={},'
+                    '\n\tshuffle={},'
+                    '\n\tinput_file={},'
+                    '\n\tqueue_size={},'
+                    '\n\tthreads={})'.format(data_dir,
+                                         batch_size,
+                                         img_height,
+                                         img_width,
+                                         seq_length,
+                                         num_scales,
+                                         file_extension,
+                                         random_scale_crop,
+                                         flipping_mode,
+                                         random_color,
+                                         imagenet_norm,
+                                         shuffle,
+                                         input_file,
+                                         queue_size,
+                                         threads))
     self.data_dir = data_dir
     self.batch_size = batch_size
     self.img_height = img_height
@@ -67,6 +99,8 @@ class DataReader(object):
 
   def read_data(self):
     """Provides images and camera intrinsics."""
+    logging.warning('read_data()')
+
     with tf.name_scope('data_loading'):
       with tf.name_scope('enqueue_paths'):
         seed = random.randint(0, 2**31 - 1)
@@ -94,6 +128,12 @@ class DataReader(object):
         elif self.file_extension == 'png':
           image_seq = tf.image.decode_png(image_contents, channels=3)
           seg_seq = tf.image.decode_png(seg_contents, channels=3)
+
+        # logging
+        logging.warning('  - seg_paths_queue: {}'.format(type(seg_paths_queue)))
+        logging.warning('  - image_seq:       {} {}'.format(type(image_seq), image_seq.shape))
+        logging.warning('  - seg_seq:         {} {}'.format(type(seg_seq), seg_seq.shape))
+        view_api(seg_seq, brief=False)
 
       with tf.name_scope('load_intrinsics'):
         cam_reader = tf.TextLineReader()
@@ -162,11 +202,13 @@ class DataReader(object):
                batch_size=self.batch_size,
                num_threads=1,
                capacity=self.queue_size + QUEUE_BUFFER * self.batch_size)
+
     return (image_stack, image_stack_norm, seg_stack, intrinsic_mat,
             intrinsic_mat_inv)
 
   def unpack_images(self, image_seq):
     """[h, w * seq_length, 3] -> [h, w, 3 * seq_length]."""
+    logging.warning('unpack_images( image_seq.shape={} )'.format(image_seq.shape))
     with tf.name_scope('unpack_images'):
       image_list = [
           image_seq[:, i * self.img_width:(i + 1) * self.img_width, :]
@@ -294,7 +336,11 @@ class DataReader(object):
 
   def compile_file_list(self, data_dir, split, load_pose=False):
     """Creates a list of input files."""
-    logging.info('data_dir: %s', data_dir)
+    logging.warning('compile_file_list('
+                    '\n\tdata_dir={},'
+                    '\n\tsplit={},'
+                    '\n\tload_pose={})'.format(data_dir, split, load_pose))
+
     with gfile.Open(os.path.join(data_dir, '%s.txt' % split), 'r') as f:
       frames = f.readlines()
       frames = [k.rstrip() for k in frames]
@@ -333,6 +379,11 @@ class DataReader(object):
       ]
       file_lists['pose_file_list'] = pose_file_list
     self.steps_per_epoch = len(image_file_list) // self.batch_size
+
+    # logging
+    for item in sorted(file_lists.keys()):
+        logging.warning('  - {:20s} : {}'.format(item, len(file_lists[item])))
+
     return file_lists
 
   @classmethod

@@ -152,6 +152,7 @@ class Model(object):
       name: A string, a name for saving / printing the results.
       tensor: A tensor to be evaluated for debugging.
     """
+    logging.warning('export( name={}, tensor={} )'.format(name, type(tensor)))
     if not hasattr(self, 'exports'):
       self.exports = {}
     if not isinstance(tensor, tf.Tensor):
@@ -161,6 +162,7 @@ class Model(object):
 
   def _build_train_graph(self):
     """Build a training graph and savers."""
+    logging.warning('_build_train_graph()')
     self._build_loss()
     self.saver = tf.train.Saver()
     # Create a saver for initializing resnet18 weights from imagenet.
@@ -177,6 +179,7 @@ class Model(object):
 
   def _build_loss(self):
     """Builds the loss tensor, to be minimized by the optimizer."""
+    logging.warning('_build_loss()')
     self.reader = reader.DataReader(
         self.data_dir,
         self.batch_size,
@@ -195,6 +198,12 @@ class Model(object):
 
     (self.image_stack, self.image_stack_norm, self.seg_stack,
      self.intrinsic_mat, _) = self.reader.read_data()
+
+    logging.warning('  - image_stack:      {} {}'.format(type(self.image_stack), self.image_stack.shape))
+    logging.warning('  - image_stack_norm: {} {}'.format(type(self.image_stack_norm), self.image_stack_norm.shape))
+    logging.warning('  - seg_stack:        {} {}'.format(type(self.seg_stack), self.seg_stack.shape))
+    logging.warning('  - intrinsic_mat:    {} {}'.format(type(self.intrinsic_mat), self.intrinsic_mat.shape))
+
     if self.learn_intrinsics:
       self.intrinsic_mat = None
     if self.intrinsic_mat is None and not self.learn_intrinsics:
@@ -209,16 +218,19 @@ class Model(object):
       object_masks_i = []
       for j in range(SEQ_LENGTH):
         current_seg = self.seg_stack[i, :, :, j * 3]  # (H, W)
+
         def process_obj_mask(obj_id):
           """Create a mask for obj_id, skipping the background mask."""
           mask = tf.logical_and(
               tf.equal(current_seg, obj_id),  # pylint: disable=cell-var-from-loop
               tf.not_equal(tf.cast(0, tf.uint8), obj_id))
+
           # Leave out vert small masks, that are most often errors.
           size = tf.reduce_sum(tf.to_int32(mask))
           mask = tf.logical_and(mask, tf.greater(size, MIN_OBJECT_AREA))
           if not self.boxify:
             return mask
+
           # Complete the mask to its bounding box.
           binary_obj_masks_y = tf.reduce_any(mask, axis=1, keepdims=True)
           binary_obj_masks_x = tf.reduce_any(mask, axis=0, keepdims=True)
@@ -280,6 +292,11 @@ class Model(object):
       self.trans_loss = 0.0
 
       def add_result_to_loss_and_summaries(endpoints, i, j):
+        logging.warning('add_result_to_loss_and_summaries('
+                        '\n\tendpoints={},'
+                        '\n\ti={},'
+                        '\n\tj={})'.format(type(endpoints), i, j))
+
         tf.summary.image(
             'valid_mask%d%d' % (i, j),
             tf.expand_dims(endpoints['depth_proximity_weight'], -1))
@@ -393,6 +410,7 @@ class Model(object):
       self.export('self.total_loss', self.total_loss)
 
   def _build_train_op(self):
+    logging.warning('_build_train_op()')
     with tf.name_scope('train_op'):
       optim = tf.train.AdamOptimizer(self.learning_rate, self.beta1)
       self.train_op = slim.learning.create_train_op(self.total_loss, optim,
@@ -400,6 +418,7 @@ class Model(object):
 
   def _build_summaries(self):
     """Adds scalar and image summaries for TensorBoard."""
+    logging.warning('_build_summaries()')
     tf.summary.scalar('total_loss', self.total_loss)
     tf.summary.scalar('reconstr_loss', self.reconstr_loss)
     if self.smooth_weight > 0:
@@ -425,6 +444,7 @@ class Model(object):
 
   def _build_depth_test_graph(self):
     """Builds depth model reading from placeholders."""
+    logging.warning('_build_depth_test_graph()')
     with tf.variable_scope(DEPTH_SCOPE, reuse=tf.AUTO_REUSE):
       input_image = tf.placeholder(
           tf.float32, [self.batch_size, self.img_height, self.img_width, 3],
@@ -452,6 +472,7 @@ class Model(object):
 
   def _build_egomotion_test_graph(self):
     """Builds graph for inference of egomotion given two images."""
+    logging.warning('_build_egomotion_test_graph()')
     with tf.variable_scope(tf.get_variable_scope(), reuse=tf.AUTO_REUSE):
       self._image1 = tf.placeholder(
           tf.float32, [self.batch_size, self.img_height, self.img_width, 3],
