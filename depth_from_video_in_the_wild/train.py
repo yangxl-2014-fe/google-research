@@ -31,6 +31,7 @@ import numpy as np
 import tensorflow.compat.v1 as tf
 
 from depth_from_video_in_the_wild import model
+from depth_from_video_in_the_wild.configs import cfg as gcfg
 
 gfile = tf.gfile
 MAX_TO_KEEP = 1000000  # Maximum number of checkpoints to keep.
@@ -116,6 +117,8 @@ def _print_losses(dir1):
 
 
 def main(_):
+  logging.warning('main(_)')
+
   # Fixed seed for repeatability
   seed = FLAGS.seed
   tf.set_random_seed(seed)
@@ -158,6 +161,8 @@ def main(_):
 
 def _train(train_model, checkpoint_dir, train_steps, summary_freq):
   """Runs a trainig loop."""
+  logging.info('_train( {}, {}, {}, {} )'.format(type(train_model), checkpoint_dir, train_steps, summary_freq))
+
   saver = train_model.saver
   print('\n\n\ntype(saver): {}\n\n\n'.format(saver))
   print('{}'.format('#' * 80))

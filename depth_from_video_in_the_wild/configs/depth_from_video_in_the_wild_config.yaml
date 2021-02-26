@@ -1,0 +1,13 @@
+WORKSPACE:
+  HOME: /disk4t0/0-MonoDepth-Database/Home-depth_from_video_in_the_wild
+  CONFIG:
+    DIR: config
+    ENABLE_LOG: true
+    RELEASE: false
+  OUTPUT:
+    DIR: output
+  LOG:
+    DIR: log
+    FILE: depth_from_video_in_the_wild.log
+  TEMP:
+    DATA_TEMP: temp

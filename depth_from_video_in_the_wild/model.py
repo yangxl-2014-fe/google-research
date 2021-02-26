@@ -81,6 +81,56 @@ class Model(object):
                foreground_dilation=8,
                learn_intrinsics=True,
                boxify=True):
+    logging.warning('Model::__init__('
+                    '\n\tdata_dir={},'
+                    '\n\tfile_extnesion={},'
+                    '\n\tis_training={},'
+                    '\n\tlearning_rate={},'
+                    '\n\tbeta1={},'
+                    '\n\treconstr_weight={},'
+                    '\n\tsmooth_weight={},'
+                    '\n\tssim_weight={},'
+                    '\n\tbatch_size={},'
+                    '\n\timg_height={},'
+                    '\n\timg_width={},'
+                    '\n\timagenet_norm={},'
+                    '\n\tweight_reg={},'
+                    '\n\trandom_scale_crop={},'
+                    '\n\trandom_color={},'
+                    '\n\tshuffle={},'
+                    '\n\tinput_file={},'
+                    '\n\tdepth_consistency_loss_weight={},'
+                    '\n\tqueue_size={},'
+                    '\n\tmotion_smoothing_weight={},'
+                    '\n\trotation_consistency_weight={},'
+                    '\n\ttranslation_consistency_weight={},'
+                    '\n\tforeground_dilation={},'
+                    '\n\tlearn_intrinsics={},'
+                    '\n\tboxify={})'.format(data_dir,
+                                            file_extension,
+                                            is_training,
+                                            learning_rate,
+                                            beta1,
+                                            reconstr_weight,
+                                            smooth_weight,
+                                            ssim_weight,
+                                            batch_size,
+                                            img_height,
+                                            img_width,
+                                            imagenet_norm,
+                                            weight_reg,
+                                            random_scale_crop,
+                                            random_color,
+                                            shuffle,
+                                            input_file,
+                                            depth_consistency_loss_weight,
+                                            queue_size,
+                                            motion_smoothing_weight,
+                                            rotation_consistency_weight,
+                                            translation_consistency_weight,
+                                            foreground_dilation,
+                                            learn_intrinsics,
+                                            boxify))
     args = locals()
     for k in sorted(args):
       self.__dict__[k] = args[k]
