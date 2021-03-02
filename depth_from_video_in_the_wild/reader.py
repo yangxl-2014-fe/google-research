@@ -67,20 +67,20 @@ class DataReader(object):
                     '\n\tinput_file={},'
                     '\n\tqueue_size={},'
                     '\n\tthreads={})'.format(data_dir,
-                                         batch_size,
-                                         img_height,
-                                         img_width,
-                                         seq_length,
-                                         num_scales,
-                                         file_extension,
-                                         random_scale_crop,
-                                         flipping_mode,
-                                         random_color,
-                                         imagenet_norm,
-                                         shuffle,
-                                         input_file,
-                                         queue_size,
-                                         threads))
+                                             batch_size,
+                                             img_height,
+                                             img_width,
+                                             seq_length,
+                                             num_scales,
+                                             file_extension,
+                                             random_scale_crop,
+                                             flipping_mode,
+                                             random_color,
+                                             imagenet_norm,
+                                             shuffle,
+                                             input_file,
+                                             queue_size,
+                                             threads))
     self.data_dir = data_dir
     self.batch_size = batch_size
     self.img_height = img_height
@@ -380,6 +380,9 @@ class DataReader(object):
       ]
       file_lists['pose_file_list'] = pose_file_list
     self.steps_per_epoch = len(image_file_list) // self.batch_size
+    logging.warning('  - len(image_file_list): {}'.format(len(image_file_list)))
+    logging.warning('  - self.batch_size:      {}'.format(self.batch_size))
+    logging.warning('  - self.steps_per_epoch: {}'.format(self.steps_per_epoch))
 
     # logging
     for item in sorted(file_lists.keys()):

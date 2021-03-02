@@ -22,12 +22,14 @@ from __future__ import print_function
 import io
 import math
 import os
+import os.path as osp
 import random
 import time
 from absl import app
 from absl import flags
 from absl import logging
 import numpy as np
+import cv2
 import tensorflow.compat.v1 as tf
 
 from depth_from_video_in_the_wild import model
@@ -218,18 +220,22 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
       global_step = results['global_step']
 
       # logging
-      logging.info('  --> training step: {:8d}'.format(step))
-      logging.info('  --> global_step:   {:8d}'.format(global_step))
-      # view_api(fetches, brief=False)
-      # view_api(results, brief=False)
-      logging.warning('fetches:')
-      for item in sorted(fetches.keys()):
-          logging.info('  fetches[\'{}\'] : {} {}'.format(item.ljust(35), type(fetches[item]), fetches[item].shape))
+      if FLAGS.debug:
+        logging.info('  --> steps_per_epoch:   {:8d}'.format(steps_per_epoch))
+        logging.info('  --> training step:     {:8d}'.format(step))
+        logging.info('  --> global_step:       {:8d}'.format(global_step))
+        # view_api(fetches, brief=False)
+        # view_api(results, brief=False)
+        logging.warning('fetches:')
+        for item in sorted(fetches.keys()):
+          logging.info('  fetches[\'{}\'] : {} {} {}'.format(item.ljust(35), type(fetches[item]), fetches[item].shape, fetches[item].dtype))
 
-      logging.warning('results:')
-      for item in sorted(results.keys()):
+        logging.warning('results:')
+        for item in sorted(results.keys()):
           if hasattr(results[item], 'shape'):
-            logging.info('  results[\'{}\'] : {} {}'.format(item.ljust(35), type(results[item]), results[item].shape))
+            logging.info('  results[\'{}\'] : {} {} {}'.format(item.ljust(35), type(results[item]), results[item].shape, results[item].dtype))
+          elif item == 'summary':
+            logging.info('  results[\'{}\'] : {}'.format(item.ljust(35), type(results[item])))
           else:
             logging.info('  results[\'{}\'] : {} {}'.format(item.ljust(35), type(results[item]), results[item]))
 
@@ -244,6 +250,9 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
             train_epoch, train_step, steps_per_epoch, this_cycle,
             time.time() - start_time, results['loss'])
 
+      # ====================================================================== #
+      # Debug Saving
+      # ====================================================================== #
       if FLAGS.debug:
         debug_dir = os.path.join(checkpoint_dir, 'debug')
         if not gfile.Exists(debug_dir):
@@ -251,13 +260,42 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
         # for name, tensor in results.iteritems():  # python 2 syntax
         for name, tensor in results.items():
           if name == 'summary':
-            logging.info('  - debug skip {} : {} {}'.format(name, tensor.shape, tensor.dtype))
+            logging.info('  - debug skip {} : {}'.format(name, type(tensor)))
             continue
+
           s = io.BytesIO()
           filename = os.path.join(debug_dir, name)
+          logging.info('  - saving <{} : {}> to {}'.format(name, type(tensor), filename))
           np.save(s, tensor)
           with gfile.Open(filename, 'w') as f:
             f.write(s.getvalue())
+
+        # ==================================================================== #
+        # Save as OpenCV Images
+        # ==================================================================== #
+        debug_image_dir = osp.join(debug_dir, 'image')
+        if not gfile.Exists(debug_image_dir):
+          gfile.MkDir(debug_image_dir)
+        full_name = str(results['self.seg_names'])
+        name_tags = full_name.split('/')
+        name_no_ext, _ = osp.splitext(name_tags[-1])
+        base_name = name_tags[-2] + '.' + name_no_ext
+        data = results['self.image_stack']
+        for id_batch in range(data.shape[0]):
+          save_name = osp.join(debug_image_dir, base_name + '_image_B-{}_T-step-{}_G-step-{}.png'.format(id_batch, step, global_step))
+          tmp_data = data[id_batch]
+          img = tmp_data.reshape((128, 416*3, 3))
+          cv2.imwrite(save_name, img)
+        data = results['self.seg_stack']
+        for id_batch in range(data.shape[0]):
+          save_name = osp.join(debug_image_dir, base_name + '_seg_B-{}_T-step-{}_G-step-{}.png'.format(id_batch, step, global_step))
+          tmp_data = data[id_batch]
+          img = tmp_data.reshape((128, 416 * 3, 3))
+          cv2.imwrite(save_name, img)
+        # save checkpoints
+        logging.info('[*] Saving checkpoint to %s...', checkpoint_dir)
+        saver.save(sess, os.path.join(checkpoint_dir, 'model'),
+                   global_step=global_step)
         return
 
       # steps_per_epoch == 0 is intended for debugging, when we run with a
