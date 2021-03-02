@@ -121,7 +121,7 @@ class DataReader(object):
         img_reader = tf.WholeFileReader()
         _, image_contents = img_reader.read(image_paths_queue)
         seg_reader = tf.WholeFileReader()
-        _, seg_contents = seg_reader.read(seg_paths_queue)
+        seg_names, seg_contents = seg_reader.read(seg_paths_queue)
         if self.file_extension == 'jpg':
           image_seq = tf.image.decode_jpeg(image_contents)
           seg_seq = tf.image.decode_jpeg(seg_contents, channels=3)
@@ -131,8 +131,9 @@ class DataReader(object):
 
         # logging
         logging.warning('  - seg_paths_queue: {}'.format(type(seg_paths_queue)))
-        logging.warning('  - image_seq:       {} {}'.format(type(image_seq), image_seq.shape))
-        logging.warning('  - seg_seq:         {} {}'.format(type(seg_seq), seg_seq.shape))
+        logging.warning('  - seg_contents:    {} {} {}'.format(type(seg_contents), seg_contents.shape, seg_contents.dtype))
+        logging.warning('  - image_seq:       {} {} {}'.format(type(image_seq), image_seq.shape, image_seq.dtype))
+        logging.warning('  - seg_seq:         {} {} {}'.format(type(seg_seq), seg_seq.shape, seg_seq.dtype))
         view_api(seg_seq, brief=False)
 
       with tf.name_scope('load_intrinsics'):
@@ -204,7 +205,7 @@ class DataReader(object):
                capacity=self.queue_size + QUEUE_BUFFER * self.batch_size)
 
     return (image_stack, image_stack_norm, seg_stack, intrinsic_mat,
-            intrinsic_mat_inv)
+            intrinsic_mat_inv, seg_names)
 
   def unpack_images(self, image_seq):
     """[h, w * seq_length, 3] -> [h, w, 3 * seq_length]."""

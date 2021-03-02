@@ -81,6 +81,7 @@ class Model(object):
                foreground_dilation=8,
                learn_intrinsics=True,
                boxify=True):
+
     logging.warning('Model::__init__('
                     '\n\tdata_dir={},'
                     '\n\tfile_extnesion={},'
@@ -131,6 +132,7 @@ class Model(object):
                                             foreground_dilation,
                                             learn_intrinsics,
                                             boxify))
+
     args = locals()
     for k in sorted(args):
       self.__dict__[k] = args[k]
@@ -197,12 +199,13 @@ class Model(object):
         queue_size=self.queue_size)
 
     (self.image_stack, self.image_stack_norm, self.seg_stack,
-     self.intrinsic_mat, _) = self.reader.read_data()
+     self.intrinsic_mat, _, self.seg_names) = self.reader.read_data()
 
-    logging.warning('  - image_stack:      {} {}'.format(type(self.image_stack), self.image_stack.shape))
-    logging.warning('  - image_stack_norm: {} {}'.format(type(self.image_stack_norm), self.image_stack_norm.shape))
-    logging.warning('  - seg_stack:        {} {}'.format(type(self.seg_stack), self.seg_stack.shape))
-    logging.warning('  - intrinsic_mat:    {} {}'.format(type(self.intrinsic_mat), self.intrinsic_mat.shape))
+    logging.warning('  - image_stack:      {} {} {}'.format(type(self.image_stack), self.image_stack.shape, self.image_stack.dtype))
+    logging.warning('  - image_stack_norm: {} {} {}'.format(type(self.image_stack_norm), self.image_stack_norm.shape, self.image_stack_norm.dtype))
+    logging.warning('  - seg_stack:        {} {} {}'.format(type(self.seg_stack), self.seg_stack.shape, self.seg_stack.dtype))
+    logging.warning('  - intrinsic_mat:    {} {} {}'.format(type(self.intrinsic_mat), self.intrinsic_mat.shape, self.intrinsic_mat.dtype))
+    logging.warning('  - seg_names:        {} {} {}'.format(type(self.seg_names), self.seg_names.shape, self.seg_names.dtype))
 
     if self.learn_intrinsics:
       self.intrinsic_mat = None
@@ -211,13 +214,18 @@ class Model(object):
                          'learn_intrinsics on to learn it instead of loading '
                          'it.')
     self.export('self.image_stack', self.image_stack)
+    self.export('self.seg_stack', self.seg_stack)
+    self.export('self.seg_names', self.seg_names)
 
     object_masks = []
     for i in range(self.batch_size):
+      temp_data = tf.unique(tf.reshape(self.seg_stack[i], [-1]))
+      logging.warning('temp_data: {} {}'.format(type(temp_data), len(temp_data)))
       object_ids = tf.unique(tf.reshape(self.seg_stack[i], [-1]))[0]
       object_masks_i = []
       for j in range(SEQ_LENGTH):
         current_seg = self.seg_stack[i, :, :, j * 3]  # (H, W)
+        logging.warning('  - current_seg: {} {} {}'.format(type(current_seg), current_seg.shape, current_seg.dtype))
 
         def process_obj_mask(obj_id):
           """Create a mask for obj_id, skipping the background mask."""
@@ -243,6 +251,8 @@ class Model(object):
       object_masks.append(tf.stack(object_masks_i, axis=-1))
 
     self.seg_stack = tf.to_float(tf.stack(object_masks, axis=0))
+    logging.warning('  - bind Masks to tf.summary.image')
+    logging.warning('self.seg_stack: {} {} {}'.format(type(self.seg_stack), self.seg_stack.shape, self.seg_stack.dtype))
     tf.summary.image('Masks', self.seg_stack)
 
     with tf.variable_scope(DEPTH_SCOPE):
@@ -296,7 +306,7 @@ class Model(object):
                         '\n\tendpoints={},'
                         '\n\ti={},'
                         '\n\tj={})'.format(type(endpoints), i, j))
-
+        logging.warning('  - bind valid_mask%d%d to tf.summary.image')
         tf.summary.image(
             'valid_mask%d%d' % (i, j),
             tf.expand_dims(endpoints['depth_proximity_weight'], -1))

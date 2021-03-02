@@ -32,6 +32,7 @@ import tensorflow.compat.v1 as tf
 
 from depth_from_video_in_the_wild import model
 from depth_from_video_in_the_wild.configs import cfg as gcfg
+from depth_from_video_in_the_wild.configs import view_api
 
 gfile = tf.gfile
 MAX_TO_KEEP = 1000000  # Maximum number of checkpoints to keep.
@@ -103,7 +104,7 @@ flags.mark_flag_as_required('checkpoint_dir')
 
 
 def load(filename):
-  with gfile.Open(filename) as f:
+  with gfile.Open(filename, 'rb') as f:
     return np.load(io.BytesIO(f.read()))
 
 
@@ -168,6 +169,12 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
                   '\n\tsummary_freq={} )'.format(
                     type(train_model), checkpoint_dir, train_steps, summary_freq))
 
+  # https://www.tensorflow.org/api_docs/python/tf/compat/v1/flags/FlagValues
+  # view_api(FLAGS, brief=False)
+  status = FLAGS.flag_values_dict()
+  for item in sorted(status.keys()):
+      logging.info('  FLAGS.{} : {}'.format(item.ljust(35), status[item]))
+
   saver = train_model.saver
   print('\n\n\ntype(saver): {}\n\n\n'.format(saver))
   print('{}'.format('#' * 80))
@@ -195,6 +202,7 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
     steps_per_epoch = train_model.reader.steps_per_epoch
     step = 1
     while step <= train_steps:
+
       fetches = {
           'train': train_model.train_op,
           'global_step': train_model.global_step,
@@ -208,6 +216,22 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
 
       results = sess.run(fetches)
       global_step = results['global_step']
+
+      # logging
+      logging.info('  --> training step: {:8d}'.format(step))
+      logging.info('  --> global_step:   {:8d}'.format(global_step))
+      # view_api(fetches, brief=False)
+      # view_api(results, brief=False)
+      logging.warning('fetches:')
+      for item in sorted(fetches.keys()):
+          logging.info('  fetches[\'{}\'] : {} {}'.format(item.ljust(35), type(fetches[item]), fetches[item].shape))
+
+      logging.warning('results:')
+      for item in sorted(results.keys()):
+          if hasattr(results[item], 'shape'):
+            logging.info('  results[\'{}\'] : {} {}'.format(item.ljust(35), type(results[item]), results[item].shape))
+          else:
+            logging.info('  results[\'{}\'] : {} {}'.format(item.ljust(35), type(results[item]), results[item]))
 
       if step % summary_freq == 0:
         sv.summary_writer.add_summary(results['summary'], global_step)
@@ -224,8 +248,10 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
         debug_dir = os.path.join(checkpoint_dir, 'debug')
         if not gfile.Exists(debug_dir):
           gfile.MkDir(debug_dir)
-        for name, tensor in results.iteritems():
+        # for name, tensor in results.iteritems():  # python 2 syntax
+        for name, tensor in results.items():
           if name == 'summary':
+            logging.info('  - debug skip {} : {} {}'.format(name, tensor.shape, tensor.dtype))
             continue
           s = io.BytesIO()
           filename = os.path.join(debug_dir, name)
@@ -246,5 +272,8 @@ def _train(train_model, checkpoint_dir, train_steps, summary_freq):
       step = global_step + 1
 
 
+################################################################################
+# main
+################################################################################
 if __name__ == '__main__':
   app.run(main)
