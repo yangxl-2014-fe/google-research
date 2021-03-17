@@ -111,11 +111,19 @@ class InitFromCheckpointHook(tf.estimator.SessionRunHook):
         as `var_list` in a Saver object used for initializing from
         `ckpt_to_init_from`. If None, the default saver will be used.
     """
+    logging.warning('InitFromCheckpointHook::__init__('
+                    '\n\tmodel_dir={},'
+                    '\n\tckpt_to_init_from={},'
+                    '\n\tvars_to_restore_fn={})'.format(
+                        model_dir, ckpt_to_init_from, vars_to_restore_fn))
+
     self._ckpt = None if tf.train.latest_checkpoint(
         model_dir) else ckpt_to_init_from
     self._vars_to_restore_fn = vars_to_restore_fn
 
   def begin(self):
+    logging.warning('InitFromCheckpointHook::begin()')
+
     if not self._ckpt:
       return
     logging.info('%s will be used for initialization.', self._ckpt)
@@ -140,6 +148,7 @@ class InitFromCheckpointHook(tf.estimator.SessionRunHook):
     self._saver = tf.train.Saver(vars_to_restore)
 
   def after_create_session(self, session, coord):
+    logging.warning('InitFromCheckpointHook::after_create_session()')
     del coord  # unused
     if not self._ckpt:
       return
@@ -165,6 +174,12 @@ def _build_estimator_spec(losses, trainer_params, mode, use_tpu=False):
   Returns:
     A EstimatorSpec or a TPUEstimatorSpec object.
   """
+  logging.warning('_build_estimatror_spec('
+                  '\n\tlosses={},'
+                  '\n\ttrainer_params={},'
+                  '\n\tmode={},'
+                  '\n\tuse_tpu={})'.format(losses, trainer_params, mode, use_tpu))
+
   if mode == tf.estimator.ModeKeys.TRAIN:
     total_loss = 0.0
     for loss_name, loss in six.iteritems(losses):
@@ -220,6 +235,13 @@ def run_local_training(losses_fn,
       as `var_list` in a Saver object used for initializing from the checkpoint
       at trainer_params.init_ckpt. If None, the default saver will be used.
   """
+  logging.warning('run_local_training('
+                  '\n\tlosses_fn={},'
+                  '\n\tinput_fn={},'
+                  '\n\ttrainer_params_overrides={},'
+                  '\n\tmodel_params={},'
+                  '\n\tvars_to_restore_fn={}'.format(losses_fn, input_fn, trainer_params_overrides, model_params, vars_to_restore_fn))
+
   trainer_params = ParameterContainer.from_defaults_and_overrides(
       TRAINER_PARAMS, trainer_params_overrides, is_strict=True)
 
@@ -277,6 +299,10 @@ def train(input_fn, loss_fn, get_vars_to_restore_fn=None):
       a `var_list` to indicate which variables to load from what names in the
       checnpoint.
   """
+  logging.warning('train('
+                  '\n\tinput_fn={},'
+                  '\n\tloss_fn={},'
+                  '\n\tget_vars_to_restore_fn={})'.format(input_fn, loss_fn, get_vars_to_restore_fn))
   params = ParameterContainer({
       'model': {
           'batch_size': 16,

@@ -1,0 +1,13 @@
+WORKSPACE:
+  HOME: /disk4t0/0-MonoDepth-Database/Home-depth_and_motion_learning
+  CONFIG:
+    DIR: config
+    ENABLE_LOG: true
+    RELEASE: false
+  OUTPUT:
+    DIR: output
+  LOG:
+    DIR: log
+    FILE: depth_and_motion_learning.log
+  TEMP:
+    DATA_TEMP: temp

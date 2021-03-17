@@ -31,6 +31,7 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import logging
 
 
 import tensorflow.compat.v1 as tf
@@ -91,6 +92,11 @@ def read_frame_sequence_from_data_path(train_file_path,
   Returns:
     A dataset object.
   """
+  logging.warning('read_frame_sequence_from_data_path('
+                  '\n\ttrain_file_path={},'
+                  '\n\tsequence_length={},'
+                  '\n\tparams={}'.format(
+                    train_file_path, sequence_length, params))
   if sequence_length not in (1, 2, 3):
     raise ValueError('sequence_length must be in (1, 2, 3), not %d.' %
                      sequence_length)
@@ -193,6 +199,8 @@ def parse_fn(filename,
   }
 
 
+'''
+# @deprecated
 def read_and_parse_data(files):
   """Default reader and parser for reading Cityscapes/KITTI data from files.
 
@@ -208,3 +216,4 @@ def read_and_parse_data(files):
   ds = ds.map(parse_fn)
 
   return ds
+'''

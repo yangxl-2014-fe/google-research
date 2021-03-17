@@ -25,6 +25,9 @@ from absl import app
 from depth_and_motion_learning import depth_motion_field_model
 from depth_and_motion_learning import training_utils
 
+from depth_and_motion_learning.configs import cfg as gcfg
+from depth_and_motion_learning.configs import view_api
+
 
 def main(argv):
   if len(argv) > 1:
