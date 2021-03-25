@@ -36,6 +36,7 @@ import logging
 
 import tensorflow.compat.v1 as tf
 from depth_and_motion_learning import parameter_container
+from depth_and_motion_learning.configs import cfg as gcfg
 
 
 FORMAT_NAME = 'STRUCT2DEPTH'
@@ -154,11 +155,9 @@ def parse_fn(filename,
                      '%d].' % (output_sequence_length, IMAGES_PER_SEQUENCE))
   image_file = tf.strings.join([filename, '.png'])
   intrinsics_file = tf.strings.join([filename, '_cam.txt'])
-  mask_file = tf.strings.join([filename, '-fseg.png'])
 
   # Read files.
   encoded_image = tf.io.read_file(image_file)
-  encoded_mask = tf.io.read_file(mask_file)
   intrinsics_content = tf.io.read_file(intrinsics_file)
   content_is_empty = tf.math.equal(intrinsics_content, '')
   filename_matches = tf.strings.regex_full_match(filename,
@@ -182,21 +181,29 @@ def parse_fn(filename,
   decoded_image = tf.to_float(decoded_image) * (1 / 255.0)
   split_image_sequence = tf.split(decoded_image, IMAGES_PER_SEQUENCE, axis=1)
 
-  decoded_mask = tf.image.decode_png(encoded_mask, channels=3)
-  mask_r, mask_g, mask_b = tf.unstack(tf.to_int32(decoded_mask), axis=-1)
-  # Since TPU does not support images of type uint8, we encode the 3 RGB uint8
-  # values into one int32 value.
-  mask = mask_r * (256 * 256) + mask_g * 256 + mask_b
-  # All images in our pipeline have 3 dimensions (height, width, channels), so
-  # we add a third dimension to the mask too.
-  mask = tf.expand_dims(mask, -1)
-  split_mask_sequence = tf.split(mask, IMAGES_PER_SEQUENCE, axis=1)
+  if gcfg.get_settings_use_mask:
+    mask_file = tf.strings.join([filename, '-no-mask-fseg.png'])
+    encoded_mask = tf.io.read_file(mask_file)
+    decoded_mask = tf.image.decode_png(encoded_mask, channels=3)
+    mask_r, mask_g, mask_b = tf.unstack(tf.to_int32(decoded_mask), axis=-1)
+    # Since TPU does not support images of type uint8, we encode the 3 RGB uint8
+    # values into one int32 value.
+    mask = mask_r * (256 * 256) + mask_g * 256 + mask_b
+    # All images in our pipeline have 3 dimensions (height, width, channels), so
+    # we add a third dimension to the mask too.
+    mask = tf.expand_dims(mask, -1)
+    split_mask_sequence = tf.split(mask, IMAGES_PER_SEQUENCE, axis=1)
 
-  return {
+    return {
       'rgb': tf.stack(split_image_sequence[:output_sequence_length]),
       'intrinsics': tf.stack([intrinsics] * output_sequence_length),
       'mask': tf.stack(split_mask_sequence[:output_sequence_length]),
-  }
+    }
+  else:
+    return {
+      'rgb': tf.stack(split_image_sequence[:output_sequence_length]),
+      'intrinsics': tf.stack([intrinsics] * output_sequence_length),
+    }
 
 
 '''

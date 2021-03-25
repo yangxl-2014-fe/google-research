@@ -4,6 +4,8 @@ WORKSPACE:
     DIR: config
     ENABLE_LOG: true
     RELEASE: false
+  SETTINGS:
+    USE_MASK: false
   OUTPUT:
     DIR: output
   LOG:

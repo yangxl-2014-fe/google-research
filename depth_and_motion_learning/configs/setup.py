@@ -123,6 +123,17 @@ class CommonAPI:
     # </Get Config >
     # ======================================================================== #
 
+    # ======================================================================== #
+    # < Get Setttings >
+    # ======================================================================== #
+    @property
+    def get_settings_use_mask(self):
+        return self.cfg.WORKSPACE.SETTINGS.USE_MASK
+
+    # ======================================================================== #
+    # </Get Settings >
+    # ======================================================================== #
+
     @property
     def get_ou_dir(self):
         return osp.join(self.get_home_dir, self.cfg.WORKSPACE.OUTPUT.DIR)
