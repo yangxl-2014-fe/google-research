@@ -20,6 +20,9 @@ https://github.com/tensorflow/models/blob/master/research/struct2depth/nets.py
 
 import abc
 
+import logging
+import json
+
 import numpy as np
 import tensorflow.compat.v1 as tf
 
@@ -116,6 +119,10 @@ class GenericDepthPredictor(object):
       mode: One of tf.estimator.ModeKeys: TRAIN, PREDICT or EVAL.
       params: A dictionary containing relevant parameters.
     """
+    logging.warning('GenericDepthPredictor::__init__('
+                    '\n\tmode={},'
+                    '\n\tparams={} )\n'.format(
+        mode, json.dumps(params, indent=6, sort_keys=True, default=str)))
     allowed_attrs = ['TRAIN', 'PREDICT', 'EVAL']
     allowed_values = [
         getattr(tf.estimator.ModeKeys, attr) for attr in allowed_attrs
@@ -126,6 +133,9 @@ class GenericDepthPredictor(object):
     self._mode = mode
     self._params = self._default_params
     self._params.update(params or {})
+
+    logging.warning('self._params={}\n'.format(
+        json.dumps(self._params, indent=2, sort_keys=True, default=str)))
 
   @property
   def _defalut_params(self):
@@ -187,6 +197,7 @@ class ResNet18DepthPredictor(GenericDepthPredictor):
         depth_scale = tf.get_variable('depth_scale', initializer=1.0)
         maybe_summary.scalar('depth_scale', depth_scale)
       else:
+        # Default depth scale
         depth_scale = 1.0
 
       return depth_scale * depth_prediction_resnet18unet(

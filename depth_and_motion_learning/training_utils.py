@@ -30,9 +30,10 @@ from __future__ import division
 from __future__ import print_function
 
 import json
+import logging
 
 from absl import flags
-from absl import logging
+# from absl import logging
 import six
 import tensorflow.compat.v1 as tf
 
@@ -81,7 +82,7 @@ TRAINER_PARAMS = {
 
     # Number of hours between each checkpoint to be saved.
     # The default value of 10,000 hours effectively disables the feature.
-    'keep_checkpoint_every_n_hours': 10000,
+    'keep_checkpoint_every_n_hours': 1,
 }
 
 
@@ -114,8 +115,9 @@ class InitFromCheckpointHook(tf.estimator.SessionRunHook):
     logging.warning('InitFromCheckpointHook::__init__('
                     '\n\tmodel_dir={},'
                     '\n\tckpt_to_init_from={},'
-                    '\n\tvars_to_restore_fn={})'.format(
-                        model_dir, ckpt_to_init_from, vars_to_restore_fn))
+                    '\n\tvars_to_restore_fn={} : {})\n'.format(
+        model_dir, ckpt_to_init_from,
+        vars_to_restore_fn, vars_to_restore_fn()))
 
     self._ckpt = None if tf.train.latest_checkpoint(
         model_dir) else ckpt_to_init_from
@@ -178,7 +180,10 @@ def _build_estimator_spec(losses, trainer_params, mode, use_tpu=False):
                   '\n\tlosses={},'
                   '\n\ttrainer_params={},'
                   '\n\tmode={},'
-                  '\n\tuse_tpu={})'.format(losses, trainer_params, mode, use_tpu))
+                  '\n\tuse_tpu={})'.format(
+      json.dumps(losses, indent=6, sort_keys=True, default=str),
+      json.dumps(trainer_params.as_dict(), indent=6, sort_keys=True, default=str),
+      mode, use_tpu))
 
   if mode == tf.estimator.ModeKeys.TRAIN:
     total_loss = 0.0
@@ -205,9 +210,14 @@ def _build_estimator_spec(losses, trainer_params, mode, use_tpu=False):
   if use_tpu:
     estimator_spec = tf.estimator.tpu.TPUEstimatorSpec(
         mode=tf.estimator.ModeKeys.TRAIN, loss=total_loss, train_op=train_op)
-  else:
+  elif mode == tf.estimator.ModeKeys.TRAIN:
     estimator_spec = tf.estimator.EstimatorSpec(
         mode=tf.estimator.ModeKeys.TRAIN, loss=total_loss, train_op=train_op)
+  else:
+    predictions = dict()
+    # predictions['predict'] = predict_depth
+    estimator_spec = tf.estimator.EstimatorSpec(
+        mode=mode, predictions=predictions)
 
   return estimator_spec
 
@@ -236,15 +246,22 @@ def run_local_training(losses_fn,
       at trainer_params.init_ckpt. If None, the default saver will be used.
   """
   logging.warning('run_local_training('
-                  '\n\tlosses_fn={},'
-                  '\n\tinput_fn={},'
+                  '\n\tlosses_fn={} : {},'
+                  '\n\tinput_fn={} : {},'
                   '\n\ttrainer_params_overrides={},'
                   '\n\tmodel_params={},'
-                  '\n\tvars_to_restore_fn={}'.format(losses_fn, input_fn, trainer_params_overrides, model_params, vars_to_restore_fn))
+                  '\n\tvars_to_restore_fn={} : {} )\n'.format(
+      losses_fn, type(losses_fn), input_fn, type(losses_fn),
+      json.dumps(trainer_params_overrides.as_dict(), indent=6, sort_keys=True, default=str),
+      json.dumps(model_params.as_dict(), indent=6, sort_keys=True, default=str),
+      vars_to_restore_fn, vars_to_restore_fn()))
 
   trainer_params = ParameterContainer.from_defaults_and_overrides(
       TRAINER_PARAMS, trainer_params_overrides, is_strict=True)
 
+  '''
+  https://www.tensorflow.org/versions/r1.15/api_docs/python/tf/estimator/RunConfig
+  '''
   run_config_params = {
       'model_dir':
           trainer_params.model_dir,
@@ -254,13 +271,27 @@ def run_local_training(losses_fn,
           trainer_params.keep_checkpoint_every_n_hours,
       'log_step_count_steps':
           50,
+      'save_checkpoints_steps':
+          2000,
+      'keep_checkpoint_max':
+          0,  # If None or 0, all checkpoint files are kept.
   }
-  logging.info(
-      'Estimators run config parameters:\n%s',
-      json.dumps(run_config_params, indent=2, sort_keys=True, default=str))
+
+  # logging
+  logging.info('Estimators run config parameters: {}\n'.format(
+      json.dumps(run_config_params, indent=2, sort_keys=True, default=str)))
   run_config = tf.estimator.RunConfig(**run_config_params)
 
   def estimator_spec_fn(features, labels, mode, params):
+    logging.warning('estimator_spec_fn('
+                    '\n\tfeatures={},'
+                    '\n\tlables={},'
+                    '\n\tmode={},'
+                    '\n\tparams={} )\n'.format(
+        json.dumps(features, indent=6, sort_keys=True, default=str),
+        type(labels), mode,
+        json.dumps(params, indent=6, sort_keys=True, default=str)))
+
     del labels  # unused
     return _build_estimator_spec(
         losses_fn(features, mode, params),
@@ -276,6 +307,11 @@ def run_local_training(losses_fn,
       model_fn=estimator_spec_fn,
       config=run_config,
       params=model_params.as_dict())
+
+  # logging
+  for item_key in sorted(run_config.__dict__.keys()):
+      logging.info('run_config.{:35s} : {}'.format(
+          item_key, run_config.__dict__[item_key]))
 
   estimator.train(
       input_fn=input_fn, max_steps=trainer_params.max_steps, hooks=[init_hook])
@@ -297,21 +333,24 @@ def train(input_fn, loss_fn, get_vars_to_restore_fn=None):
       The latter is a callable that receives no arguments and returns a
       dictionary that can be passed to a tf.train.Saver object's constructor as
       a `var_list` to indicate which variables to load from what names in the
-      checnpoint.
+      checkpoint.
   """
   logging.warning('train('
-                  '\n\tinput_fn={},'
-                  '\n\tloss_fn={},'
-                  '\n\tget_vars_to_restore_fn={})'.format(input_fn, loss_fn, get_vars_to_restore_fn))
-  params = ParameterContainer({
-      'model': {
-          'batch_size': 16,
-          'input': {}
-      },
-  }, {'trainer': {
-      'master': FLAGS.master,
-      'model_dir': FLAGS.model_dir
-  }})
+                  '\n\tinput_fn={} : {},'
+                  '\n\tloss_fn={} : {},'
+                  '\n\tget_vars_to_restore_fn={} )\n'.format(
+      input_fn, type(input_fn), loss_fn, type(loss_fn),
+      get_vars_to_restore_fn))
+
+  params = ParameterContainer(
+      {'model': {
+        'batch_size': 16,
+        'input': {}
+      }},
+      {'trainer': {
+        'master': FLAGS.master,
+        'model_dir': FLAGS.model_dir
+      }})
 
   params.override(FLAGS.param_overrides)
 
@@ -325,9 +364,129 @@ def train(input_fn, loss_fn, get_vars_to_restore_fn=None):
   vars_to_restore_fn = (
       get_vars_to_restore_fn(init_ckpt_type) if init_ckpt_type else None)
 
-  logging.info(
-      'Starting training with the following parameters:\n%s',
-      json.dumps(params.as_dict(), indent=2, sort_keys=True, default=str))
+  # logging
+  logging.info('init_ckpt_type: {}'.format(init_ckpt_type))
+  logging.info('Starting training with the following parameters: {}'.format(
+      json.dumps(params.as_dict(), indent=2, sort_keys=True, default=str)))
+  logging.info('vars_to_restore_fn(): {}\n'.format(
+      json.dumps(vars_to_restore_fn(), indent=2, sort_keys=True, default=str)))
 
   run_local_training(loss_fn, input_fn, params.trainer, params.model,
                      vars_to_restore_fn)
+
+
+def run_local_predict(predict_fn,
+                      input_fn_predict,
+                      trainer_params_overrides,
+                      model_params,
+                      vars_to_restore_fn=None):
+    logging.warning('run_local_predict('
+                    '\n\tpredict_fn={} : {},'
+                    '\n\tinput_fn_predict={} : {},'
+                    '\n\ttrainer_params_overrides={},'
+                    '\n\tmodel_params={},'
+                    '\n\tvars_to_restore_fn={} : {} )\n'.format(
+        predict_fn, type(predict_fn), input_fn_predict, type(predict_fn),
+        json.dumps(trainer_params_overrides.as_dict(), indent=6, sort_keys=True,
+                   default=str),
+        json.dumps(model_params.as_dict(), indent=6, sort_keys=True,
+                   default=str),
+        vars_to_restore_fn, vars_to_restore_fn()))
+
+    trainer_params = ParameterContainer.from_defaults_and_overrides(
+          TRAINER_PARAMS, trainer_params_overrides, is_strict=True)
+
+    run_config_params = {
+          'model_dir':
+              trainer_params.model_dir,
+          'save_summary_steps':
+              50,
+          'keep_checkpoint_every_n_hours':
+              trainer_params.keep_checkpoint_every_n_hours,
+          'log_step_count_steps':
+              50,
+          'save_checkpoints_steps':
+              2000,
+          'keep_checkpoint_max':
+              0,  # If None or 0, all checkpoint files are kept.
+      }
+
+    # logging
+    logging.info('Estimators run config parameters: {}\n'.format(
+          json.dumps(run_config_params, indent=2, sort_keys=True, default=str)))
+    run_config = tf.estimator.RunConfig(**run_config_params)
+
+    def estimator_spec_fn(features, labels, mode, params):
+        logging.warning('estimator_spec_fn('
+                        '\n\tfeatures={},'
+                        '\n\tlables={},'
+                        '\n\tmode={},'
+                        '\n\tparams={} )\n'.format(
+            json.dumps(features, indent=6, sort_keys=True, default=str),
+            type(labels), mode,
+            json.dumps(params, indent=6, sort_keys=True, default=str)))
+
+        mode = tf.estimator.ModeKeys.PREDICT
+
+        del labels  # unused
+        return _build_estimator_spec(
+            predict_fn(features["rgb"], params),
+            trainer_params=trainer_params,
+            mode=mode,
+            use_tpu=False)
+
+    init_hook = InitFromCheckpointHook(trainer_params.model_dir,
+                                         trainer_params.init_ckpt,
+                                         vars_to_restore_fn)
+
+    # logging
+    for item_key in sorted(run_config.__dict__.keys()):
+        logging.info('run_config.{:35s} : {}'.format(
+            item_key, run_config.__dict__[item_key]))
+
+    estimator = tf.estimator.Estimator(
+          model_fn=estimator_spec_fn,
+          config=run_config,
+          params=model_params.as_dict())
+
+    pred_result_generator = estimator.predict(
+        input_fn=input_fn_predict, hooks=[init_hook])
+
+    logging.warning('pred_result_generator: {}'.format(type(pred_result_generator)))
+    for pred_no, pred_dict in enumerate(pred_result_generator):
+        logging.info('pred_no:   {}'.format(pred_no))
+        logging.info('pred_dict: {}'.format(pred_dict))
+
+
+def predict(input_fn_predict, predict_fn, get_vars_to_restore_fn=None):
+    logging.warning('predict('
+                    '\n\tinput_fn_predict={} : {},'
+                    '\n\tpredict_fn={} : {},'
+                    '\n\tget_vars_to_restore_fn={} )\n'.format(
+        input_fn_predict, type(input_fn_predict), predict_fn, type(predict_fn),
+        get_vars_to_restore_fn))
+
+    params = ParameterContainer(
+        {'model': {
+            'batch_size': 16,
+            'input': {}
+        }},
+        {'trainer': {
+            'master': FLAGS.master,
+            'model_dir': FLAGS.model_dir
+        }})
+
+    params.override(FLAGS.param_overrides)
+
+    init_ckpt_type = params.trainer.get('init_ckpt_type')
+
+    if init_ckpt_type and not get_vars_to_restore_fn:
+        raise ValueError(
+            'An init_ckpt_type was specified (%s), but no get_vars_to_restore_fn '
+            'was provided.' % init_ckpt_type)
+
+    vars_to_restore_fn = (
+          get_vars_to_restore_fn(init_ckpt_type) if init_ckpt_type else None)
+
+    run_local_predict(predict_fn, input_fn_predict, params.trainer, params.model,
+                      vars_to_restore_fn)

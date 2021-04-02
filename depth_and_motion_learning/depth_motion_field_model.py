@@ -20,6 +20,9 @@ from __future__ import division
 
 from __future__ import print_function
 
+import json
+import logging
+
 import tensorflow.compat.v1 as tf
 
 from depth_and_motion_learning import depth_prediction_nets
@@ -104,7 +107,7 @@ DEFAULT_PARAMS = {
     # True to feed depth predictions into the motion field network.
     'cascade': True,
     # True to use a pretrained mask network to confine moving objects.
-    'use_mask': False,
+    'use_mask': False,  # Whether to use segmentation mask
     'learn_egomotion': True,
 
     # Number of pixels ro dilate the foreground mask by (0 to not dilate).
@@ -144,8 +147,19 @@ def loss_fn(features, mode, params):
     ValueError: `features` endpoints that don't conform with their expected
        structure.
   """
+  logging.warning('loss_fn('
+                  '\n\tfeatures={},'
+                  '\n\tmode={},'
+                  '\n\tparams={} )\n'.format(
+      json.dumps(features, indent=6, sort_keys=True, default=str),
+      mode,
+      json.dumps(params, indent=6, sort_keys=True, default=str)))
+
   params = parameter_container.ParameterContainer.from_defaults_and_overrides(
       DEFAULT_PARAMS, params, is_strict=True, strictness_depth=2)
+
+  logging.warning('all_training_params:\n\tparams={}\n'.format(
+      json.dumps(params.as_dict(), indent=6, sort_keys=True, default=str)))
 
   if len(features['rgb']) != 2 or 'depth' in features and len(
       features['depth']) != 2:
@@ -306,11 +320,16 @@ def input_fn(params):
   Returns:
     A tf.data.Dataset object.
   """
+  logging.warning('input_fn('
+                  '\n\tparams={} )\n'.format(
+      json.dumps(params, indent=6, sort_keys=True, default=str)))
 
   params = parameter_container.ParameterContainer.from_defaults_and_overrides(
       DEFAULT_PARAMS, params, is_strict=True, strictness_depth=2)
   dataset = reader_cityscapes.read_frame_pairs_from_data_path(
       params.input.data_path, params.input.reader)
+
+  logging.warning('dataset: {}'.format(type(dataset)))
 
   if params.learn_intrinsics.enabled and params.learn_intrinsics.per_video:
     intrinsics_ht = intrinsics_utils.HashTableIndexer(
@@ -363,6 +382,18 @@ def input_fn(params):
   return dataset.prefetch(params.input.prefetch_size)
 
 
+def input_fn_predict(params):
+    logging.warning('input_fn_predict('
+                    '\n\tparams={} )\n'.format(
+        json.dumps(params, indent=6, sort_keys=True, default=str)))
+
+    params = parameter_container.ParameterContainer.from_defaults_and_overrides(
+        DEFAULT_PARAMS, params, is_strict=True, strictness_depth=2)
+    dataset = reader_cityscapes.read_frame_pairs_from_data_path(
+        params.input.data_path, params.input.reader)
+    return dataset.prefetch(params.input.prefetch_size)
+
+
 def get_vars_to_restore_fn(initialization):
   """Returns a vars_to_restore_fn for various types of `initialization`.
 
@@ -373,6 +404,7 @@ def get_vars_to_restore_fn(initialization):
   Raises:
     ValueError: `initialization` is not supported
   """
+  logging.warning('get_vars_to_restore_fn( {} )\n'.format(initialization))
 
   if initialization == 'imagenet':
 
