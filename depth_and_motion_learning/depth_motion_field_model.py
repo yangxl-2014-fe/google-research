@@ -329,7 +329,7 @@ def input_fn(params):
   dataset = reader_cityscapes.read_frame_pairs_from_data_path(
       params.input.data_path, params.input.reader)
 
-  logging.warning('dataset: {}'.format(type(dataset)))
+  logging.warning('type(dataset):       {}'.format(type(dataset)))
 
   if params.learn_intrinsics.enabled and params.learn_intrinsics.per_video:
     intrinsics_ht = intrinsics_utils.HashTableIndexer(
@@ -425,6 +425,8 @@ def get_vars_to_restore_fn(initialization):
           name = v.op.name.replace('moving_mean', 'mu')
           name = name.replace('moving_variance', 'sigma')
           vars_to_restore[name[len('depth_prediction') + 1:]] = v
+      logging.info('vars_to_restore: {}'.format(
+          json.dumps(vars_to_restore, indent=2, sort_keys=True, default=str)))
       return vars_to_restore
 
     return vars_to_restore_fn

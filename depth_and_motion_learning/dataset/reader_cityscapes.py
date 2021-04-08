@@ -74,6 +74,12 @@ def read_frame_pairs_from_data_path(train_file_path, params=None):
   Returns:
     A dataset object.
   """
+  logging.warning('read_frame_pairs_from_data_path('
+                  '\n\ttrain_file_path={},'
+                  '\n\tparams={} )\n'.format(
+    train_file_path,
+    json.dumps(params.as_dict(), indent=6, sort_keys=True, default=str)))
+
   return read_frame_sequence_from_data_path(
       train_file_path, sequence_length=2, params=params)
 
@@ -98,7 +104,7 @@ def read_frame_sequence_from_data_path(train_file_path,
                   '\n\tsequence_length={},'
                   '\n\tparams={} )\n'.format(
     train_file_path, sequence_length,
-    json.dumps(params.as_dict(), indent=2, sort_keys=True, default=str)))
+    json.dumps(params.as_dict(), indent=6, sort_keys=True, default=str)))
 
   if sequence_length not in (1, 2, 3):
     raise ValueError('sequence_length must be in (1, 2, 3), not %d.' %
@@ -109,7 +115,11 @@ def read_frame_sequence_from_data_path(train_file_path,
   with tf.gfile.Open(train_file_path) as f:
     lines = f.read().split('\n')
 
+  logging.warning('len(lines)_initial:   {:10d}'.format(len(lines)))
+
   lines = list(filter(None, lines))  # Filter out empty strings.
+
+  logging.warning('len(lines)_non_empty: {:10d}'.format(len(lines)))
 
   directory = os.path.dirname(train_file_path)
 
@@ -123,17 +133,28 @@ def read_frame_sequence_from_data_path(train_file_path,
 
   files = [make_filename(line) for line in lines]
 
+  logging.warning('len(files):           {:10d}'.format(len(files)))
+
   ds = tf.data.Dataset.from_tensor_slices(files)  # https://www.tensorflow.org/versions/r1.15/api_docs/python/tf/data/Dataset#from_tensor_slices
-  ds = ds.repeat()
+  ds = ds.repeat()  # https://www.tensorflow.org/versions/r1.15/api_docs/python/tf/compat/v2/data/Dataset#repeat
+  # The default behavior (if count is None or -1) is for the dataset be repeated indefinitely.
 
   def parse_fn_for_pairs(filename):
     return parse_fn(filename, output_sequence_length=sequence_length)
 
   num_parallel_calls = min(len(lines), params.num_parallel_calls)
+  logging.warning('len(files):           {:10d}'.format(len(files)))
+
+  logging.warning('params.num_parallel_calls:  {:10d}'.format(params.num_parallel_calls))
+  logging.warning('num_parallel_calls:   {:10d}'.format(num_parallel_calls))
+
   ds = ds.map(parse_fn_for_pairs, num_parallel_calls=num_parallel_calls)
 
   # logging
-  logging.info('ds: {}'.format(type(ds)))
+  logging.warning('type(ds):             {}'.format(type(ds)))
+  for item_key in sorted(ds.__dict__.keys()):
+    logging.info('ds.{:35s} : {}'.format(
+      item_key, ds.__dict__[item_key]))
 
   return ds
 
@@ -184,8 +205,14 @@ def parse_fn(filename,
   # Decode and normalize images.
   decoded_image = tf.image.decode_png(encoded_image, channels=3)
   decoded_image = tf.to_float(decoded_image) * (1 / 255.0)
-  split_image_sequence = tf.split(decoded_image, IMAGES_PER_SEQUENCE, axis=1)
+  split_image_sequence = tf.split(decoded_image, IMAGES_PER_SEQUENCE, axis=1)  # get partial image
 
+  logging.warning('{} --> {} --- {}'.format(
+    decoded_image.shape, len(split_image_sequence), split_image_sequence[0].shape))
+
+  # ========================================================================== #
+  # < Disable mask >
+  # ========================================================================== #
   if gcfg.get_settings_use_mask:
     mask_file = tf.strings.join([filename, '-no-mask-fseg.png'])
     encoded_mask = tf.io.read_file(mask_file)
@@ -204,6 +231,9 @@ def parse_fn(filename,
       'intrinsics': tf.stack([intrinsics] * output_sequence_length),
       'mask': tf.stack(split_mask_sequence[:output_sequence_length]),
     }
+  # ========================================================================== #
+  # </Disable mask >
+  # ========================================================================== #
   else:
     return {
       'rgb': tf.stack(split_image_sequence[:output_sequence_length]),

@@ -121,14 +121,18 @@ class InitFromCheckpointHook(tf.estimator.SessionRunHook):
 
     self._ckpt = None if tf.train.latest_checkpoint(
         model_dir) else ckpt_to_init_from
+    logging.info('self._ckpt: {}'.format(self._ckpt))
+
     self._vars_to_restore_fn = vars_to_restore_fn
 
   def begin(self):
     logging.warning('InitFromCheckpointHook::begin()')
+    logging.info('self._ckpt: {}'.format(self._ckpt))
 
     if not self._ckpt:
       return
     logging.info('%s will be used for initialization.', self._ckpt)
+
     # Build a saver object for initializing from a checkpoint, or use the
     # default one if no vars_to_restore_fn was given.
     self._reset_step = None
@@ -152,10 +156,12 @@ class InitFromCheckpointHook(tf.estimator.SessionRunHook):
   def after_create_session(self, session, coord):
     logging.warning('InitFromCheckpointHook::after_create_session()')
     del coord  # unused
+
+    logging.info('self._ckpt: {}'.format(self._ckpt))
     if not self._ckpt:
       return
     self._saver.restore(session, self._ckpt)
-    self._saver.restore(session, self._ckpt)
+    # self._saver.restore(session, self._ckpt)
     if self._reset_step is not None:
       session.run(self._reset_step)
 
