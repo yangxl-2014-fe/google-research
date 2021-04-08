@@ -220,10 +220,9 @@ def _build_estimator_spec(losses, trainer_params, mode, use_tpu=False):
     estimator_spec = tf.estimator.EstimatorSpec(
         mode=tf.estimator.ModeKeys.TRAIN, loss=total_loss, train_op=train_op)
   else:
-    predictions = dict()
     # predictions['predict'] = predict_depth
     estimator_spec = tf.estimator.EstimatorSpec(
-        mode=mode, predictions=predictions)
+        mode=mode, predictions=losses)
 
   return estimator_spec
 
@@ -441,10 +440,6 @@ def run_local_predict(predict_fn,
             mode=mode,
             use_tpu=False)
 
-    init_hook = InitFromCheckpointHook(trainer_params.model_dir,
-                                         trainer_params.init_ckpt,
-                                         vars_to_restore_fn)
-
     # logging
     for item_key in sorted(run_config.__dict__.keys()):
         logging.info('run_config.{:35s} : {}'.format(
@@ -456,7 +451,7 @@ def run_local_predict(predict_fn,
           params=model_params.as_dict())
 
     pred_result_generator = estimator.predict(
-        input_fn=input_fn_predict, hooks=[init_hook])
+        input_fn=input_fn_predict)
 
     logging.warning('pred_result_generator: {}'.format(type(pred_result_generator)))
     for pred_no, pred_dict in enumerate(pred_result_generator):
