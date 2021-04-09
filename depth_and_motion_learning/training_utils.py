@@ -66,7 +66,7 @@ TRAINER_PARAMS = {
     # If not None, the training will be initialized form this checkpoint.
     'init_ckpt': None,
 
-    # A string, specifies the format of a checkpoint form which to initialize.
+    # A string, specifies the format of a checkpoint from which to initialize.
     # The model code is expected to convert this string into a
     # vars_to_restore_fn (see below),
     'init_ckpt_type': None,
@@ -455,8 +455,8 @@ def run_local_predict(predict_fn,
 
     logging.warning('pred_result_generator: {}'.format(type(pred_result_generator)))
     for pred_no, pred_dict in enumerate(pred_result_generator):
-        logging.info('pred_no:   {}'.format(pred_no))
-        logging.info('pred_dict: {}'.format(pred_dict))
+        logging.info('pred_no:     {}'.format(pred_no))
+        logging.info('  pred_dict: {} {}'.format(type(pred_dict), pred_dict.shape))
 
 
 def predict(input_fn_predict, predict_fn, get_vars_to_restore_fn=None):

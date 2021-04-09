@@ -382,15 +382,15 @@ def input_fn(params):
   return dataset.prefetch(params.input.prefetch_size)
 
 
-def input_fn_predict(params):
-    logging.warning('input_fn_predict('
+def predict_input_fn(params):
+    logging.warning('predict_input_fn('
                     '\n\tparams={} )\n'.format(
         json.dumps(params, indent=6, sort_keys=True, default=str)))
 
     params = parameter_container.ParameterContainer.from_defaults_and_overrides(
         DEFAULT_PARAMS, params, is_strict=True, strictness_depth=2)
     dataset = reader_cityscapes.read_frame_pairs_from_data_path(
-        params.input.data_path, params.input.reader)
+        params.input.data_path, params.input.reader, repeat=False)
     return dataset.prefetch(params.input.prefetch_size)
 
 

@@ -62,7 +62,7 @@ READ_FRAME_PAIRS_FROM_DATA_PATH_PARAMS = {
 }
 
 
-def read_frame_pairs_from_data_path(train_file_path, params=None):
+def read_frame_pairs_from_data_path(train_file_path, params=None, repeat=True):
   """Reads frame pairs from a text file in the struct2depth format.
 
   Args:
@@ -70,23 +70,25 @@ def read_frame_pairs_from_data_path(train_file_path, params=None):
       examples.
     params: A dictionary or a ParameterContainer with overrides for the default
       params (READ_FRAME_PAIRS_FROM_DATA_PATH_PARAMS)
+    repeat: bool
 
   Returns:
     A dataset object.
   """
   logging.warning('read_frame_pairs_from_data_path('
                   '\n\ttrain_file_path={},'
-                  '\n\tparams={} )\n'.format(
+                  '\n\tparams={},'
+                  '\n\trepeat={} )\n'.format(
     train_file_path,
-    json.dumps(params.as_dict(), indent=6, sort_keys=True, default=str)))
+    json.dumps(params.as_dict(), indent=6, sort_keys=True, default=str), repeat))
 
   return read_frame_sequence_from_data_path(
-      train_file_path, sequence_length=2, params=params)
+      train_file_path, sequence_length=2, params=params, repeat=repeat)
 
 
 def read_frame_sequence_from_data_path(train_file_path,
                                        sequence_length=IMAGES_PER_SEQUENCE,
-                                       params=None):
+                                       params=None, repeat=True):
   """Reads frames sequences from a text file in the struct2depth format.
 
   Args:
@@ -95,6 +97,7 @@ def read_frame_sequence_from_data_path(train_file_path,
     sequence_length: Number of images in the output sequence (1, 2, or 3).
     params: A dictionary or a ParameterContainer with overrides for the default
       params (READ_FRAME_PAIRS_FROM_DATA_PATH_PARAMS)
+    repeat: bool
 
   Returns:
     A dataset object.
@@ -102,9 +105,10 @@ def read_frame_sequence_from_data_path(train_file_path,
   logging.warning('read_frame_sequence_from_data_path('
                   '\n\ttrain_file_path={},'
                   '\n\tsequence_length={},'
-                  '\n\tparams={} )\n'.format(
+                  '\n\tparams={},'
+                  '\n\trepeat={} )\n'.format(
     train_file_path, sequence_length,
-    json.dumps(params.as_dict(), indent=6, sort_keys=True, default=str)))
+    json.dumps(params.as_dict(), indent=6, sort_keys=True, default=str), repeat))
 
   if sequence_length not in (1, 2, 3):
     raise ValueError('sequence_length must be in (1, 2, 3), not %d.' %
@@ -136,8 +140,11 @@ def read_frame_sequence_from_data_path(train_file_path,
   logging.warning('len(files):           {:10d}'.format(len(files)))
 
   ds = tf.data.Dataset.from_tensor_slices(files)  # https://www.tensorflow.org/versions/r1.15/api_docs/python/tf/data/Dataset#from_tensor_slices
-  ds = ds.repeat()  # https://www.tensorflow.org/versions/r1.15/api_docs/python/tf/compat/v2/data/Dataset#repeat
-  # The default behavior (if count is None or -1) is for the dataset be repeated indefinitely.
+  if repeat:
+    ds = ds.repeat()  # https://www.tensorflow.org/versions/r1.15/api_docs/python/tf/compat/v2/data/Dataset#repeat
+    # The default behavior (if count is None or -1) is for the dataset be repeated indefinitely.
+  else:
+    ds = ds.repeat(1)
 
   def parse_fn_for_pairs(filename):
     return parse_fn(filename, output_sequence_length=sequence_length)
