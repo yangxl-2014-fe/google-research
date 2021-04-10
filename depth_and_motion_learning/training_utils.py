@@ -380,22 +380,20 @@ def train(input_fn, loss_fn, get_vars_to_restore_fn=None):
                      vars_to_restore_fn)
 
 
-def run_local_predict(predict_fn,
-                      input_fn_predict,
+def run_local_predict(predict_model_fn,
+                      predict_input_fn,
                       trainer_params_overrides,
                       model_params,
                       vars_to_restore_fn=None):
     logging.warning('run_local_predict('
-                    '\n\tpredict_fn={} : {},'
-                    '\n\tinput_fn_predict={} : {},'
+                    '\n\tpredict_model_fn={} : {},'
+                    '\n\tpredict_input_fn={} : {},'
                     '\n\ttrainer_params_overrides={},'
                     '\n\tmodel_params={},'
                     '\n\tvars_to_restore_fn={} : {} )\n'.format(
-        predict_fn, type(predict_fn), input_fn_predict, type(predict_fn),
-        json.dumps(trainer_params_overrides.as_dict(), indent=6, sort_keys=True,
-                   default=str),
-        json.dumps(model_params.as_dict(), indent=6, sort_keys=True,
-                   default=str),
+        predict_model_fn, type(predict_model_fn), predict_input_fn, type(predict_model_fn),
+        json.dumps(trainer_params_overrides.as_dict(), indent=6, sort_keys=True, default=str),
+        json.dumps(model_params.as_dict(), indent=6, sort_keys=True, default=str),
         vars_to_restore_fn, vars_to_restore_fn()))
 
     trainer_params = ParameterContainer.from_defaults_and_overrides(
@@ -435,7 +433,7 @@ def run_local_predict(predict_fn,
 
         del labels  # unused
         return _build_estimator_spec(
-            predict_fn(features["rgb"], params),
+            predict_model_fn(features["rgb"], params),
             trainer_params=trainer_params,
             mode=mode,
             use_tpu=False)
@@ -451,7 +449,7 @@ def run_local_predict(predict_fn,
           params=model_params.as_dict())
 
     pred_result_generator = estimator.predict(
-        input_fn=input_fn_predict)
+        input_fn=predict_input_fn)
 
     logging.warning('pred_result_generator: {}'.format(type(pred_result_generator)))
     for pred_no, pred_dict in enumerate(pred_result_generator):
@@ -459,12 +457,12 @@ def run_local_predict(predict_fn,
         logging.info('  pred_dict: {} {}'.format(type(pred_dict), pred_dict.shape))
 
 
-def predict(input_fn_predict, predict_fn, get_vars_to_restore_fn=None):
+def predict(predict_input_fn, predict_model_fn, get_vars_to_restore_fn=None):
     logging.warning('predict('
-                    '\n\tinput_fn_predict={} : {},'
-                    '\n\tpredict_fn={} : {},'
+                    '\n\tpredict_input_fn{} : {},'
+                    '\n\tpredict_model_fn={} : {},'
                     '\n\tget_vars_to_restore_fn={} )\n'.format(
-        input_fn_predict, type(input_fn_predict), predict_fn, type(predict_fn),
+        predict_input_fn, type(predict_input_fn), predict_model_fn, type(predict_model_fn),
         get_vars_to_restore_fn))
 
     params = ParameterContainer(
@@ -489,5 +487,6 @@ def predict(input_fn_predict, predict_fn, get_vars_to_restore_fn=None):
     vars_to_restore_fn = (
           get_vars_to_restore_fn(init_ckpt_type) if init_ckpt_type else None)
 
-    run_local_predict(predict_fn, input_fn_predict, params.trainer, params.model,
+    run_local_predict(predict_model_fn, predict_input_fn,
+                      params.trainer, params.model,
                       vars_to_restore_fn)

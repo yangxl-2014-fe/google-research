@@ -394,6 +394,11 @@ def predict_input_fn(params):
     return dataset.prefetch(params.input.prefetch_size)
 
 
+def predict_input_fn_ex(params):
+    logging.warning('predict_input_fn_ex(\n\tparams={} )\n'.format(
+        json.dumps(params, indent=6, sort_keys=True, default=str)))
+
+
 def get_vars_to_restore_fn(initialization):
   """Returns a vars_to_restore_fn for various types of `initialization`.
 
