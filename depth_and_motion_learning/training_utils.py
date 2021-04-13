@@ -88,6 +88,8 @@ TRAINER_PARAMS = {
     'keep_checkpoint_every_n_hours': 1,
 }
 
+latest_checkpoint = ''
+
 
 class InitFromCheckpointHook(tf.estimator.SessionRunHook):
   """A hook for initializing training from a checkpoint.
@@ -124,6 +126,8 @@ class InitFromCheckpointHook(tf.estimator.SessionRunHook):
 
     self._ckpt = None if tf.train.latest_checkpoint(
         model_dir) else ckpt_to_init_from
+    global latest_checkpoint
+    latest_checkpoint = self._ckpt
     logging.info('self._ckpt: {}'.format(self._ckpt))
 
     self._vars_to_restore_fn = vars_to_restore_fn
@@ -464,10 +468,14 @@ def run_local_predict(predict_model_fn,
         pred_all.append(pred_dict)
     output_dir = model_params.output.save_path
     npy_name = model_params.output.npy_name
+    steps = model_params.output.steps
     if not osp.exists(output_dir):
         os.makedirs(output_dir)
-    np.save(osp.join(output_dir, npy_name), pred_all)
-    print('saving {}'.format(osp.join(output_dir, npy_name)))
+    save_name = osp.join(output_dir, '{}_{}.npy'.format(npy_name, steps))
+    np.save(save_name, pred_all)
+    global latest_checkpoint
+    print('latest_checkpoint: {}'.format(latest_checkpoint))
+    print('saving {}'.format(save_name))
 
 
 def predict(predict_input_fn, predict_model_fn, get_vars_to_restore_fn=None):

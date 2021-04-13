@@ -71,6 +71,7 @@ DEFAULT_PARAMS = {
     'output': {
         'save_path': '',
         'npy_name': '',
+        'steps': 0,
     },
     'loss_weights': {
         'rgb_consistency': 1.0,
