@@ -86,6 +86,49 @@ def read_frame_pairs_from_data_path(train_file_path, params=None, repeat=True):
       train_file_path, sequence_length=2, params=params, repeat=repeat)
 
 
+def view_dataset_info(dataset, tag):
+  """Print attributes of tf.data.Dataset.
+
+  Parameters
+  ----------
+  dataset: tf.data.Dataset
+  tag: str
+
+  References
+  ----------
+  https://www.tensorflow.org/versions/r1.15/api_docs/python/tf/data/Dataset#attributes
+  """
+  logging.warning('Attributes of {} @ tag={}'.format(type(dataset), tag))
+  if isinstance(dataset.element_spec, dict):
+    logging.info('  - element_spec:   {}'.format(
+      json.dumps(dataset.element_spec, indent=6, sort_keys=True, default=str)))
+  else:
+    logging.info('  - element_spec:   {}'.format(dataset.element_spec))
+
+  if isinstance(dataset.output_classes, dict):
+    logging.info('  - output_classes: {}'.format(
+      json.dumps(dataset.output_classes, indent=6, sort_keys=True, default=str)))
+  else:
+    logging.info('  - output_classes: {}'.format(dataset.output_classes))
+
+  if isinstance(dataset.output_shapes, dict):
+    logging.info('  - ouput_shapes:   {}'.format(
+      json.dumps(dataset.output_shapes, indent=6, sort_keys=True, default=str)))
+  else:
+    logging.info('  - ouput_shapes:   {}'.format(dataset.output_shapes))
+
+  # logging.info('  - output_types:   {}'.format(dataset.ouput_types))
+
+  for item_key in sorted(dataset.__dict__.keys()):
+    if isinstance(dataset.__dict__[item_key], dict):
+      logging.info('  - run_config.{:35s} : {}'.format(
+        item_key,
+        json.dumps(dataset.__dict__[item_key], indent=6, sort_keys=True, default=str)))
+    else:
+      logging.info('  - run_config.{:35s} : {}'.format(
+        item_key, dataset.__dict__[item_key]))
+
+
 def read_frame_sequence_from_data_path(train_file_path,
                                        sequence_length=IMAGES_PER_SEQUENCE,
                                        params=None, repeat=True):
@@ -140,11 +183,13 @@ def read_frame_sequence_from_data_path(train_file_path,
   logging.warning('len(files):           {:10d}'.format(len(files)))
 
   ds = tf.data.Dataset.from_tensor_slices(files)  # https://www.tensorflow.org/versions/r1.15/api_docs/python/tf/data/Dataset#from_tensor_slices
+  view_dataset_info(ds, '1')
   if repeat:
     ds = ds.repeat()  # https://www.tensorflow.org/versions/r1.15/api_docs/python/tf/compat/v2/data/Dataset#repeat
     # The default behavior (if count is None or -1) is for the dataset be repeated indefinitely.
   else:
     ds = ds.repeat(1)
+  view_dataset_info(ds, '2')
 
   def parse_fn_for_pairs(filename):
     return parse_fn(filename, output_sequence_length=sequence_length)
@@ -156,6 +201,7 @@ def read_frame_sequence_from_data_path(train_file_path,
   logging.warning('num_parallel_calls:   {:10d}'.format(num_parallel_calls))
 
   ds = ds.map(parse_fn_for_pairs, num_parallel_calls=num_parallel_calls)
+  view_dataset_info(ds, '3')
 
   # logging
   logging.warning('type(ds):             {}'.format(type(ds)))
@@ -183,6 +229,8 @@ def parse_fn(filename,
            1.0.
     'intrinsics': a list of intrinsics values.
   """
+  logging.warning('parse_fn(\n\tfilename={}, \n\toutput_sequence_length={} )'.format(filename, output_sequence_length))
+
   if output_sequence_length > IMAGES_PER_SEQUENCE or output_sequence_length < 1:
     raise ValueError('Invalid output_sequence_length %d: must be within [1, '
                      '%d].' % (output_sequence_length, IMAGES_PER_SEQUENCE))

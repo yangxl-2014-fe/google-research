@@ -31,6 +31,9 @@ from __future__ import print_function
 
 import json
 import logging
+import os
+import os.path as osp
+import numpy as np
 
 from absl import flags
 # from absl import logging
@@ -452,9 +455,19 @@ def run_local_predict(predict_model_fn,
         input_fn=predict_input_fn)
 
     logging.warning('pred_result_generator: {}'.format(type(pred_result_generator)))
+    pred_all = []
     for pred_no, pred_dict in enumerate(pred_result_generator):
         logging.info('pred_no:     {}'.format(pred_no))
         logging.info('  pred_dict: {} {}'.format(type(pred_dict), pred_dict.shape))
+
+        # https://www.tensorflow.org/api_docs/python/tf/make_ndarray
+        pred_all.append(pred_dict)
+    output_dir = model_params.output.save_path
+    npy_name = model_params.output.npy_name
+    if not osp.exists(output_dir):
+        os.makedirs(output_dir)
+    np.save(osp.join(output_dir, npy_name), pred_all)
+    print('saving {}'.format(osp.join(output_dir, npy_name)))
 
 
 def predict(predict_input_fn, predict_model_fn, get_vars_to_restore_fn=None):

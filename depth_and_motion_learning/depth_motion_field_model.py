@@ -20,8 +20,13 @@ from __future__ import division
 
 from __future__ import print_function
 
+import numpy as np
 import json
 import logging
+
+import PIL.Image as pil
+import cv2
+import os.path as osp
 
 import tensorflow.compat.v1 as tf
 
@@ -39,6 +44,7 @@ DEFAULT_PARAMS = {
     'batch_size': None,
     'input': {
         'data_path': '',
+        'dataset_dir': '',
 
         # If the average L1 distance between two image is less than this
         # threshold, they will be assumed to be near duplicates - a situation
@@ -61,6 +67,10 @@ DEFAULT_PARAMS = {
         # Size into which images will be resized, after random cropping.
         'image_height': 128,
         'image_width': 416,
+    },
+    'output': {
+        'save_path': '',
+        'npy_name': '',
     },
     'loss_weights': {
         'rgb_consistency': 1.0,
@@ -395,8 +405,60 @@ def predict_input_fn(params):
 
 
 def predict_input_fn_ex(params):
+    """ Read input tensor for prediction.
+
+    Parameters
+    ----------
+    params: dict
+
+    References
+    ----------
+    /home/ftx/Documents/yangxl-2014-fe/my_forked/google-research/depth_and_motion_learning/dataset/reader_cityscapes.py
+        def parse_fn(filename, output_sequence_length)
+    """
     logging.warning('predict_input_fn_ex(\n\tparams={} )\n'.format(
         json.dumps(params, indent=6, sort_keys=True, default=str)))
+
+    params = parameter_container.ParameterContainer.from_defaults_and_overrides(
+        DEFAULT_PARAMS, params, is_strict=True, strictness_depth=2)
+
+    img_height = params.image_preprocessing.image_height
+    img_width = params.image_preprocessing.image_width
+    dataset_dir = params.input.dataset_dir
+    test_txt = params.input.data_path
+
+    # Ref: my_forked/google-research/depth_and_motion_learning/dataset/reader_cityscapes.py
+    with tf.gfile.Open(test_txt) as f:
+        lines = f.read().split('\n')
+    lines = list(filter(None, lines))
+
+    def make_filename(line):
+        return osp.join(dataset_dir, line)
+
+    files = [make_filename(line) for line in lines]
+    ds = tf.data.Dataset.from_tensor_slices(files)
+
+    '''
+    def parse_image_pil(filename):
+        # AttributeError: 'Tensor' object has no attribute 'read'
+        raw_im = pil.open(filename)
+        scaled_im = raw_im.resize((img_width, img_height), pil.ANTIALIAS)
+
+        # https://www.tensorflow.org/api_docs/python/tf/convert_to_tensor
+        tensor_im = tf.convert_to_tensor(scaled_im, dtype=tf.float32)
+        tensor_im = tf.to_float(tensor_im) * (1.0 / 255.0)
+        return tensor_im
+    '''
+
+    def parse_image(filename):
+        encoded_image = tf.io.read_file(filename)
+        decoded_image = tf.image.decode_png(encoded_image, channels=3)
+        scaled_image = tf.image.resize(decoded_image, [img_height, img_width])
+        scaled_image = tf.to_float(scaled_image) * (1.0 / 255.0)
+        return { 'rgb': tf.expand_dims(scaled_image, axis=0) }
+
+    ds = ds.map(parse_image, num_parallel_calls=64)
+    return ds.prefetch(params.input.prefetch_size)
 
 
 def get_vars_to_restore_fn(initialization):
