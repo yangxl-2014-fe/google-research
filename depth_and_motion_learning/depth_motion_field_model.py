@@ -20,12 +20,8 @@ from __future__ import division
 
 from __future__ import print_function
 
-import numpy as np
 import json
 import logging
-
-import PIL.Image as pil
-import cv2
 import os.path as osp
 
 import tensorflow.compat.v1 as tf
@@ -71,7 +67,7 @@ DEFAULT_PARAMS = {
     'output': {
         'save_path': '',
         'npy_name': '',
-        'steps': 0,
+        'steps': '-',
     },
     'loss_weights': {
         'rgb_consistency': 1.0,
@@ -438,18 +434,6 @@ def predict_input_fn_ex(params):
 
     files = [make_filename(line) for line in lines]
     ds = tf.data.Dataset.from_tensor_slices(files)
-
-    '''
-    def parse_image_pil(filename):
-        # AttributeError: 'Tensor' object has no attribute 'read'
-        raw_im = pil.open(filename)
-        scaled_im = raw_im.resize((img_width, img_height), pil.ANTIALIAS)
-
-        # https://www.tensorflow.org/api_docs/python/tf/convert_to_tensor
-        tensor_im = tf.convert_to_tensor(scaled_im, dtype=tf.float32)
-        tensor_im = tf.to_float(tensor_im) * (1.0 / 255.0)
-        return tensor_im
-    '''
 
     def parse_image(filename):
         encoded_image = tf.io.read_file(filename)
