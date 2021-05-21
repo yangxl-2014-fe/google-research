@@ -62,15 +62,15 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Depth and Motion Learning')
     parser.add_argument('--input_dir',
                         help='path to freetech captured image sequences',
-                        default='/disk4t0/Fast-Exp/mono-depth-freetech-captured/1',
+                        default='/disk4t0/0-MonoDepth-Database/mono-depth-freetech-captured',
                         required=False)
     parser.add_argument('--input_calib',
                         help='path to intrinsic calibrated file',
-                        default='/disk4t0/Fast-Exp/mono-depth-freetech-captured/CameraParams.yml',
+                        default='/disk4t0/0-MonoDepth-Database/mono-depth-freetech-captured/CameraParams.yml',
                         required=False)
     parser.add_argument('--output_dir',
                         help='path to saving struct2depth format data',
-                        default='/disk4t0/Fast-Exp/mono-depth-freetech-captured/struct2depth-format',
+                        default='/disk4t0/0-MonoDepth-Database/mono-depth-freetech-captured_processed',
                         required=False)
     parser.add_argument('--img_ext',
                         help='extension format of images',
@@ -101,6 +101,7 @@ def get_intr_info(file_calib):
     mat[1][1] = float(fs.getNode('fy').real())
     mat[0][2] = float(fs.getNode('cu').real())
     mat[1][2] = float(fs.getNode('cv').real())
+    mat[2][2] = 1.0
     intr_info['mat'] = mat
     intr_info['h'] = int(fs.getNode('imgH').real())
     intr_info['w'] = int(fs.getNode('imgW').real())
@@ -119,51 +120,52 @@ def get_intr_info(file_calib):
 def run(params):
     """ 合成三小图格式. """
     intr_info = get_intr_info(params.input_calib)
-    files = glob.glob(params.input_dir + '/*' + params.img_ext)
-    files = [file for file in files if not 'disp' in file and not 'flip' in file and not 'seg' in file]
-    files = sorted(files)
+    if not osp.exists(params.output_dir):
+        os.makedirs(params.output_dir)
+    with open(osp.join(params.output_dir, 'train.txt'), 'wt') as f_ou:
+        for d in sorted(glob.glob(params.input_dir + '/*/')):
+            files = glob.glob(d + '*' + params.img_ext)
+            files = [file for file in files if not 'disp' in file and not 'flip' in file and not 'seg' in file]
+            files = sorted(files)
+            seqname = d.split('/')[-2]
 
-    seqname = params.input_dir.split('/')[-1]
-    save_dir = osp.join(params.output_dir, seqname)
-    if not osp.exists(save_dir):
-        os.makedirs(save_dir)
-    ct = 0  # image count
-    for i in range(params.seq_length, len(files)+1, params.stepsize):
-        img_num = str(ct).zfill(10)
-        if osp.exists(osp.join(save_dir, img_num + '.png')):
-            ct += 1
-            continue
+            save_dir = osp.join(params.output_dir, seqname)
+            if not osp.exists(save_dir):
+                os.makedirs(save_dir)
+            ct = 0  # image count
+            for i in range(params.seq_length, len(files)+1, params.stepsize):
+                img_num = str(ct).zfill(10)
+                if osp.exists(osp.join(save_dir, img_num + '.png')):
+                    ct += 1
+                    continue
 
-        big_img = np.zeros(shape=(params.height, params.width*params.seq_length, 3))
-        big_img_seg = np.zeros(shape=(params.height, params.width*params.seq_length, 3))
-        wct = 0  # window count number
-        calib_representation = ''
-        for j in range(i-params.seq_length, i):
-            img = cv2.imread(files[j])
-            orig_height, orig_width, _ = img.shape
+                big_img = np.zeros(shape=(params.height, params.width*params.seq_length, 3))
+                big_img_seg = np.zeros(shape=(params.height, params.width*params.seq_length, 3))
+                wct = 0  # window count number
+                calib_representation = ''
+                for j in range(i-params.seq_length, i):
+                    img = cv2.imread(files[j])
+                    orig_height, orig_width, _ = img.shape
 
-            zoom_x = params.width / orig_width
-            zoom_y = params.height / orig_height
+                    zoom_x = params.width / orig_width
+                    zoom_y = params.height / orig_height
 
-            calib_current = intr_info['mat'].copy()
-            calib_current[0, 0] *= zoom_x
-            calib_current[0, 2] *= zoom_x
-            calib_current[1, 1] *= zoom_y
-            calib_current[1, 2] *= zoom_y
+                    calib_current = intr_info['mat'].copy()
+                    calib_current[0, 0] *= zoom_x
+                    calib_current[0, 2] *= zoom_x
+                    calib_current[1, 1] *= zoom_y
+                    calib_current[1, 2] *= zoom_y
 
-            calib_representation = ','.join([str(c) for c in calib_current.flatten()])
-            img = cv2.resize(img, (params.width, params.height))
-            big_img[:, wct*params.width:(wct+1)*params.width] = img
-            wct += 1
-        cv2.imwrite(save_dir + '/' + img_num + '.png', big_img)
-        cv2.imwrite(save_dir + '/' + img_num + '-fseg.png', big_img_seg)
-        with open(save_dir + '/' + img_num + '_cam.txt', 'w') as f:
-            f.write(calib_representation)
-        ct += 1
-        pass
-    pass
-
-
+                    calib_representation = ','.join([str(c) for c in calib_current.flatten()])
+                    img = cv2.resize(img, (params.width, params.height))
+                    big_img[:, wct*params.width:(wct+1)*params.width] = img
+                    wct += 1
+                cv2.imwrite(save_dir + '/' + img_num + '.png', big_img)
+                cv2.imwrite(save_dir + '/' + img_num + '-fseg.png', big_img_seg)
+                with open(save_dir + '/' + img_num + '_cam.txt', 'w') as f:
+                    f.write(calib_representation)
+                ct += 1
+                f_ou.write('{} {}\n'.format(seqname, img_num))
 
 if __name__ == "__main__":
     # app.run(main)
