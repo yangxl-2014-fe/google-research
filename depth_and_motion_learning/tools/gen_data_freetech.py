@@ -30,8 +30,12 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import sys
 import os
 import os.path as osp
+import time
+import datetime
+import logging
 
 import glob
 import argparse
@@ -42,6 +46,8 @@ from absl import flags
 import cv2
 import numpy as np
 
+
+quick_debug_mode = False
 
 FLAGS = flags.FLAGS
 flags.DEFINE_string('dir_input', '', 'path to freetech captured image sequences.')
@@ -66,7 +72,7 @@ def parse_args():
                         required=False)
     parser.add_argument('--input_calib',
                         help='path to intrinsic calibrated file',
-                        default='/disk4t0/0-MonoDepth-Database/mono-depth-freetech-captured/CameraParams.yml',
+                        default='/disk4t0/0-MonoDepth-Database/mono-depth-freetech-captured/CameraParams_v2.yml',
                         required=False)
     parser.add_argument('--output_dir',
                         help='path to saving struct2depth format data',
@@ -117,11 +123,44 @@ def get_intr_info(file_calib):
     return intr_info
 
 
+def get_log_file(output_dir):
+    name_log = osp.join(output_dir, 'gen_data_freetech.log')
+    str_root, str_ext = osp.splitext(name_log)
+    time_now = '{}'.format(
+        datetime.datetime.now().strftime('_%Y-%m-%d'))
+    name_log = str_root + time_now + str_ext
+    return name_log
+
+
+def setup_log(params):
+    medium_format = (
+        '%(levelname)s : %(filename)s[%(lineno)d]'
+        ' >>> %(message)s'
+    )
+    log_file = get_log_file(params.output_dir)
+    logging.basicConfig(
+        filename=log_file,
+        filemode='w',
+        level=logging.INFO,
+        format=medium_format
+    )
+    logging.info('@{} created at {}'.format(
+        log_file,
+        datetime.datetime.now())
+    )
+    print('\n===== log_file: {}\n'.format(log_file))
+
+
 def run(params):
     """ 合成三小图格式. """
     intr_info = get_intr_info(params.input_calib)
     if not osp.exists(params.output_dir):
         os.makedirs(params.output_dir)
+
+    # Logfile
+    setup_log(params)
+
+    f_ou_line = 0
     with open(osp.join(params.output_dir, 'train.txt'), 'wt') as f_ou:
         for d in sorted(glob.glob(params.input_dir + '/*/')):
             files = glob.glob(d + '*' + params.img_ext)
@@ -138,6 +177,10 @@ def run(params):
                 if osp.exists(osp.join(save_dir, img_num + '.png')):
                     ct += 1
                     continue
+
+                if quick_debug_mode:
+                    if ct > 10:
+                        break
 
                 big_img = np.zeros(shape=(params.height, params.width*params.seq_length, 3))
                 big_img_seg = np.zeros(shape=(params.height, params.width*params.seq_length, 3))
@@ -166,9 +209,22 @@ def run(params):
                     f.write(calib_representation)
                 ct += 1
                 f_ou.write('{} {}\n'.format(seqname, img_num))
+                f_ou_line += 1
+                if f_ou_line % 500 == 0:
+                    logging.info('processing {:>7d}'.format(f_ou_line))
+                    print('processing {:>7d}'.format(f_ou_line))
+
 
 if __name__ == "__main__":
+    print('sys.version: {}'.format(sys.version))
+    print('@{}'.format(datetime.datetime.now()))
+
+    time_beg = time.time()
+
     # app.run(main)
     args = parse_args()
     run(args)
-    pass
+
+    time_end = time.time()
+    print('@elapsed {}'.format(time_end - time_beg))
+    logging.info('@elapsed {}'.format(time_end - time_beg))
